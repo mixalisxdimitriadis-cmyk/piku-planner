@@ -1,26 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Plus, X, Clock, Users, Calendar, CheckCircle2, Circle, Timer, FolderKanban, Trash2, Edit3, ChevronLeft, ChevronRight, Save, Moon, Sun, FileText, Link, Paperclip, CheckSquare, Square as SquareIcon, ChevronDown, ChevronUp, BarChart3, Euro, Tag } from 'lucide-react';
 
-const initClients = [
+const defaultClients = [
   { id: 1, name: 'Creative Agency', color: '#FF6B6B' },
   { id: 2, name: 'Tech Startup', color: '#4ECDC4' },
   { id: 3, name: 'Marketing Co', color: '#845EF7' },
 ];
 
-const initCategories = [
+const defaultCategories = [
   { id: 1, name: 'Web Design', color: '#228BE6' },
   { id: 2, name: 'Social Media', color: '#40C057' },
   { id: 3, name: 'Motion Design', color: '#FA5252' },
   { id: 4, name: 'Project Mgmt', color: '#FAB005' },
 ];
 
-const initTasks = [
-  { id: 1, title: 'Homepage wireframes', clientId: 1, categoryId: 1, status: 'todo', priority: 'high', hourlyRate: 60, startDate: '2025-02-10', deadline: '2025-02-20', timeSpent: 2.5, notes: 'Client θέλει minimal design', checklist: [{ id: 1, text: 'Research', done: true }, { id: 2, text: 'Wireframes', done: false }], attachments: [{ id: 1, type: 'link', name: 'Figma', url: 'https://figma.com' }] },
-  { id: 2, title: 'Instagram campaign', clientId: 2, categoryId: 2, status: 'todo', priority: 'medium', hourlyRate: 40, startDate: '2025-02-12', deadline: '2025-02-18', timeSpent: 0, notes: '', checklist: [], attachments: [] },
-  { id: 3, title: 'Logo animation', clientId: 1, categoryId: 3, status: 'inprogress', priority: 'high', hourlyRate: 80, startDate: '2025-02-15', deadline: '2025-02-22', timeSpent: 4, notes: 'After Effects', checklist: [{ id: 1, text: 'Storyboard', done: true }], attachments: [] },
-  { id: 4, title: 'Weekly report', clientId: 3, categoryId: 4, status: 'done', priority: 'low', hourlyRate: 50, startDate: '2025-02-01', deadline: '2025-02-14', timeSpent: 6, notes: '', checklist: [], attachments: [] },
-  { id: 5, title: 'January Project', clientId: 1, categoryId: 1, status: 'done', priority: 'high', hourlyRate: 65, startDate: '2025-01-05', deadline: '2025-01-20', timeSpent: 8, notes: '', checklist: [], attachments: [] },
-];
+const defaultTasks = [];
 
 const columns = [
   { id: 'todo', title: 'To Do', icon: Circle, color: '#868E96' },
@@ -34,10 +28,31 @@ const priorities = [
   { id: 'high', name: 'High', color: '#FA5252' },
 ];
 
+// Helper functions for localStorage
+const loadFromStorage = (key, defaultValue) => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveToStorage = (key, value) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error('Error saving to localStorage:', e);
+  }
+};
+
 export default function PikuPlanner() {
-  const [tasks, setTasks] = useState(initTasks);
-  const [clients, setClients] = useState(initClients);
-  const [categories, setCategories] = useState(initCategories);
+  const [tasks, setTasks] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [view, setView] = useState('board');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showAddTask, setShowAddTask] = useState(null);
@@ -54,8 +69,47 @@ export default function PikuPlanner() {
   const [dark, setDark] = useState(true);
   const [newCheckItem, setNewCheckItem] = useState('');
   const [newAtt, setNewAtt] = useState({ type: 'link', name: '', url: '' });
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 1, 1));
-  const [statsMonth, setStatsMonth] = useState(new Date(2025, 1, 1));
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [statsMonth, setStatsMonth] = useState(new Date());
+
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedTasks = loadFromStorage('piku_tasks', defaultTasks);
+    const savedClients = loadFromStorage('piku_clients', defaultClients);
+    const savedCategories = loadFromStorage('piku_categories', defaultCategories);
+    const savedDark = loadFromStorage('piku_dark', true);
+    
+    setTasks(savedTasks);
+    setClients(savedClients);
+    setCategories(savedCategories);
+    setDark(savedDark);
+    setIsLoaded(true);
+  }, []);
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_tasks', tasks);
+    }
+  }, [tasks, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_clients', clients);
+    }
+  }, [clients, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_categories', categories);
+    }
+  }, [categories, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_dark', dark);
+    }
+  }, [dark, isLoaded]);
 
   useEffect(() => {
     let i; if (tracking) i = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -161,10 +215,22 @@ export default function PikuPlanner() {
 
   const th = { bg: dark ? 'bg-slate-900' : 'bg-slate-50', card: dark ? 'bg-slate-800' : 'bg-white', border: dark ? 'border-slate-700' : 'border-slate-200', text: dark ? 'text-slate-100' : 'text-slate-800', muted: dark ? 'text-slate-400' : 'text-slate-500', input: dark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-200', col: dark ? 'bg-slate-800/50' : 'bg-slate-100', hover: dark ? 'hover:bg-slate-700' : 'hover:bg-slate-100', sel: dark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-50 text-blue-700' };
 
+  // Show loading state
+  if (!isLoaded) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-3xl mx-auto mb-4">🦊</div>
+          <p className={th.text}>Loading Piku Planner...</p>
+        </div>
+      </div>
+    );
+  }
+
   const TaskCard = ({ task: t }) => {
     const cl = getClient(t.clientId), cat = getCat(t.categoryId), pri = getPri(t.priority);
     const isTrack = tracking === t.id, isEdit = editing === t.id, isExp = expanded === t.id;
-    const earn = t.timeSpent * t.hourlyRate, chkDone = t.checklist.filter(c=>c.done).length, chkTot = t.checklist.length;
+    const earn = t.timeSpent * t.hourlyRate, chkDone = t.checklist?.filter(c=>c.done).length || 0, chkTot = t.checklist?.length || 0;
 
     return (
       <div draggable={!isEdit && !isExp} onDragStart={e => onDragStart(e, t)} className={`${th.card} rounded-lg border ${th.border} p-3 cursor-move hover:shadow-md transition-all group ${dragged?.id === t.id ? 'opacity-50' : ''} ${isTrack ? 'ring-2 ring-red-400' : ''}`}>
@@ -209,7 +275,7 @@ export default function PikuPlanner() {
             <div className="flex flex-wrap gap-1.5 mb-2">
               {chkTot > 0 && <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${chkDone===chkTot?'bg-emerald-500/20 text-emerald-400':dark?'bg-slate-700':'bg-slate-100'} ${th.muted}`}><CheckSquare className="w-3 h-3"/>{chkDone}/{chkTot}</span>}
               {t.notes && <span className={`text-xs px-1.5 py-0.5 rounded ${dark?'bg-slate-700':'bg-slate-100'} ${th.muted}`}><FileText className="w-3 h-3"/></span>}
-              {t.attachments.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${dark?'bg-slate-700':'bg-slate-100'} ${th.muted}`}><Paperclip className="w-3 h-3"/>{t.attachments.length}</span>}
+              {t.attachments?.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${dark?'bg-slate-700':'bg-slate-100'} ${th.muted}`}><Paperclip className="w-3 h-3"/>{t.attachments.length}</span>}
             </div>
             <div className={`text-xs ${th.muted} mb-2 flex items-center gap-2 flex-wrap`}>
               <span className="text-amber-500 bg-amber-500/20 px-1.5 py-0.5 rounded">€{t.hourlyRate}/h</span>
@@ -221,11 +287,11 @@ export default function PikuPlanner() {
               <div className={`mt-3 pt-3 border-t ${th.border} space-y-3`}>
                 <div>
                   <label className={`text-xs ${th.muted} flex items-center gap-1 mb-1`}><FileText className="w-3 h-3"/>Notes</label>
-                  <textarea value={t.notes} onChange={e => updateTask(t.id, 'notes', e.target.value)} rows={2} placeholder="Σημειώσεις..." className={`w-full px-2 py-1 text-xs border rounded resize-none ${th.input}`}/>
+                  <textarea value={t.notes || ''} onChange={e => updateTask(t.id, 'notes', e.target.value)} rows={2} placeholder="Σημειώσεις..." className={`w-full px-2 py-1 text-xs border rounded resize-none ${th.input}`}/>
                 </div>
                 <div>
                   <label className={`text-xs ${th.muted} flex items-center gap-1 mb-1`}><CheckSquare className="w-3 h-3"/>Checklist</label>
-                  {t.checklist.map(c => (
+                  {(t.checklist || []).map(c => (
                     <div key={c.id} className={`flex items-center gap-2 py-1 px-2 rounded ${th.hover} group/c`}>
                       <button onClick={() => toggleCheck(t.id, c.id)} className={c.done ? 'text-emerald-400' : th.muted}>{c.done ? <CheckSquare className="w-4 h-4"/> : <SquareIcon className="w-4 h-4"/>}</button>
                       <span className={`flex-1 text-xs ${c.done ? 'line-through '+th.muted : th.text}`}>{c.text}</span>
@@ -239,7 +305,7 @@ export default function PikuPlanner() {
                 </div>
                 <div>
                   <label className={`text-xs ${th.muted} flex items-center gap-1 mb-1`}><Paperclip className="w-3 h-3"/>Attachments</label>
-                  {t.attachments.map(a => (
+                  {(t.attachments || []).map(a => (
                     <div key={a.id} className={`flex items-center gap-2 py-1 px-2 rounded mb-1 ${dark?'bg-slate-700/50':'bg-slate-50'} group/a`}>
                       {a.type === 'link' ? <Link className="w-3 h-3 text-blue-400"/> : <FileText className="w-3 h-3 text-amber-400"/>}
                       <span className={`flex-1 text-xs truncate ${th.text}`}>{a.name}</span>
