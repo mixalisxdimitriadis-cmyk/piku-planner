@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Plus, X, Clock, Users, Calendar, CheckCircle2, Circle, Timer, FolderKanban, Trash2, Edit3, ChevronLeft, ChevronRight, Save, Moon, Sun, FileText, Link, Paperclip, CheckSquare, Square as SquareIcon, ChevronDown, ChevronUp, BarChart3, Euro, Tag } from 'lucide-react';
-import { db } from './firebase.config';
+import { db } from '../firebase.config';
 import { collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const defaultClients = [
