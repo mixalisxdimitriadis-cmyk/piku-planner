@@ -11,7 +11,8 @@
   "next": "14.x",
   "react": "18.x",
   "react-dom": "18.x",
-  "firebase": "^10.8.0"
+  "firebase": "^10.12.2",
+  "lucide-react": "^0.263.1"
 }
   "devDependencies": {
     "tailwindcss": "^3.4.0",
