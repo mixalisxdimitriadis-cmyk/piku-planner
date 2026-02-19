@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Plus, X, Clock, Users, Calendar, CheckCircle2, Circle, Timer, FolderKanban, Trash2, Edit3, ChevronLeft, ChevronRight, Save, Moon, Sun, FileText, Link, Paperclip, CheckSquare, Square as SquareIcon, ChevronDown, ChevronUp, BarChart3, Euro, Tag } from 'lucide-react';
 
-// ΤΟ URL ΠΟΥ ΣΟΥ ΕΔΩΣΕ ΤΟ APPS SCRIPT
-const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzBZQR5HjVcJhJfV-_9wNVWSB-11Hw4WkgleLga-f3aK8BrtG1kil7xT_6_Fx9jRVaV/exec';
-
 const defaultClients = [
   { id: 1, name: 'Creative Agency', color: '#FF6B6B' },
   { id: 2, name: 'Tech Startup', color: '#4ECDC4' },
@@ -15,9 +12,9 @@ const defaultCategories = [
   { id: 2, name: 'Social Media', color: '#40C057' },
   { id: 3, name: 'Motion Design', color: '#FA5252' },
   { id: 4, name: 'Project Mgmt', color: '#FAB005' },
-  { id: 5, name: 'Graphic Design', color: '#FFA500' },
-  { id: 6, name: 'Video Editing', color: '#FF0000' },
 ];
+
+const defaultTasks = [];
 
 const columns = [
   { id: 'todo', title: 'To Do', icon: Circle, color: '#868E96' },
@@ -31,12 +28,31 @@ const priorities = [
   { id: 'high', name: 'High', color: '#FA5252' },
 ];
 
+// Helper functions for localStorage
+const loadFromStorage = (key, defaultValue) => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveToStorage = (key, value) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.error('Error saving to localStorage:', e);
+  }
+};
+
 export default function PikuPlanner() {
   const [tasks, setTasks] = useState([]);
   const [clients, setClients] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [view, setView] = useState('board');
   const [selectedClient, setSelectedClient] = useState(null);
   const [showAddTask, setShowAddTask] = useState(null);
@@ -56,57 +72,47 @@ export default function PikuPlanner() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statsMonth, setStatsMonth] = useState(new Date());
 
-  // Φόρτωση δεδομένων από Google Sheets
+  // Load data from localStorage on mount
   useEffect(() => {
-    loadAllData();
+    const savedTasks = loadFromStorage('piku_tasks', defaultTasks);
+    const savedClients = loadFromStorage('piku_clients', defaultClients);
+    const savedCategories = loadFromStorage('piku_categories', defaultCategories);
+    const savedDark = loadFromStorage('piku_dark', true);
+    
+    setTasks(savedTasks);
+    setClients(savedClients);
+    setCategories(savedCategories);
+    setDark(savedDark);
+    setIsLoaded(true);
   }, []);
 
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
-      const [clientsData, categoriesData, tasksData] = await Promise.all([
-        fetchFromSheet('clients'),
-        fetchFromSheet('categories'),
-        fetchFromSheet('tasks')
-      ]);
-      
-      setClients(clientsData.length ? clientsData : defaultClients);
-      setCategories(categoriesData.length ? categoriesData : defaultCategories);
-      setTasks(tasksData);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_tasks', tasks);
     }
-  };
-
-  const fetchFromSheet = async (sheetName) => {
-    try {
-      const response = await fetch(`${SHEETS_API_URL}?sheet=${sheetName}`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error(`Error loading ${sheetName}:`, error);
-      return [];
-    }
-  };
-
-  const saveToSheet = async (sheetName, data) => {
-    try {
-      await fetch(SHEETS_API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, sheet: sheetName })
-      });
-    } catch (error) {
-      console.error(`Error saving to ${sheetName}:`, error);
-    }
-  };
+  }, [tasks, isLoaded]);
 
   useEffect(() => {
-    let i; 
-    if (tracking) i = setInterval(() => setElapsed(e => e + 1), 1000);
+    if (isLoaded) {
+      saveToStorage('piku_clients', clients);
+    }
+  }, [clients, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_categories', categories);
+    }
+  }, [categories, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_dark', dark);
+    }
+  }, [dark, isLoaded]);
+
+  useEffect(() => {
+    let i; if (tracking) i = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => clearInterval(i);
   }, [tracking]);
 
@@ -114,177 +120,50 @@ export default function PikuPlanner() {
   const fmtH = h => { const hr = Math.floor(h); const m = Math.round((h-hr)*60); return m > 0 ? `${hr}h ${m}m` : `${hr}h`; };
 
   const startTrack = id => { setTracking(id); setElapsed(0); };
-  
-  const stopTrack = async () => {
+  const stopTrack = () => {
     if (tracking && elapsed > 0) {
       const hrs = Math.round((elapsed/3600)*100)/100;
-      const updatedTasks = tasks.map(t => 
-        t.id === tracking ? {...t, timeSpent: (t.timeSpent || 0) + Math.max(hrs, 0.01)} : t
-      );
-      setTasks(updatedTasks);
-      
-      const task = updatedTasks.find(t => t.id === tracking);
-      if (task) await saveToSheet('tasks', task);
+      setTasks(tasks.map(t => t.id === tracking ? {...t, timeSpent: t.timeSpent + Math.max(hrs, 0.01)} : t));
     }
-    setTracking(null); 
-    setElapsed(0);
+    setTracking(null); setElapsed(0);
   };
 
   const onDragStart = (e, t) => { setDragged(t); e.dataTransfer.effectAllowed = 'move'; };
-  
-  const onDrop = async (e, status) => { 
-    e.preventDefault(); 
-    if (dragged) { 
-      const updatedTasks = tasks.map(t => t.id === dragged.id ? {...t, status} : t);
-      setTasks(updatedTasks);
-      
-      const task = updatedTasks.find(t => t.id === dragged.id);
-      if (task) await saveToSheet('tasks', task);
-      
-      setDragged(null); 
-    } 
-  };
+  const onDrop = (e, status) => { e.preventDefault(); if (dragged) { setTasks(tasks.map(t => t.id === dragged.id ? {...t, status} : t)); setDragged(null); } };
 
-  const addTask = async (status) => {
+  const addTask = status => {
     if (newTask.title && newTask.clientId && newTask.categoryId) {
-      const newTaskData = { 
-        id: Date.now(), 
-        ...newTask, 
-        clientId: +newTask.clientId, 
-        categoryId: +newTask.categoryId, 
-        hourlyRate: +newTask.hourlyRate, 
-        status, 
-        timeSpent: 0, 
-        notes: '', 
-        checklist: [], 
-        attachments: [] 
-      };
-      
-      setTasks([...tasks, newTaskData]);
-      await saveToSheet('tasks', newTaskData);
-      
+      setTasks([...tasks, { id: Date.now(), ...newTask, clientId: +newTask.clientId, categoryId: +newTask.categoryId, hourlyRate: +newTask.hourlyRate, status, timeSpent: 0, notes: '', checklist: [], attachments: [] }]);
       setNewTask({ title: '', clientId: '', categoryId: '', priority: 'medium', hourlyRate: 50, startDate: '', deadline: '' });
       setShowAddTask(null);
     }
   };
 
-  const updateTask = async (id, field, value) => {
-    const updatedTasks = tasks.map(t => 
-      t.id === id ? {...t, [field]: ['hourlyRate','timeSpent'].includes(field) ? +value||0 : ['clientId','categoryId'].includes(field) ? +value : value} : t
-    );
-    setTasks(updatedTasks);
-    
-    const task = updatedTasks.find(t => t.id === id);
-    if (task) await saveToSheet('tasks', task);
-  };
+  const updateTask = (id, k, v) => setTasks(tasks.map(t => t.id === id ? {...t, [k]: ['hourlyRate','timeSpent'].includes(k) ? +v||0 : ['clientId','categoryId'].includes(k) ? +v : v} : t));
+  const deleteTask = id => { if (tracking === id) stopTrack(); setTasks(tasks.filter(t => t.id !== id)); setEditing(null); setExpanded(null); };
 
-  const deleteTask = async (id) => {
-    if (tracking === id) stopTrack();
-    setTasks(tasks.filter(t => t.id !== id));
-    setEditing(null);
-    setExpanded(null);
-    // Σημείωση: Η διαγραφή από Google Sheets απαιτεί επιπλέον λειτουργία
-  };
+  const addClient = () => { if (newClient.name) { setClients([...clients, { id: Date.now(), ...newClient }]); setNewClient({ name: '', color: '#228BE6' }); setShowAddClient(false); } };
+  const deleteClient = id => { setClients(clients.filter(c => c.id !== id)); setTasks(tasks.filter(t => t.clientId !== id)); if (selectedClient === id) setSelectedClient(null); };
 
-  const addClient = async () => {
-    if (newClient.name) { 
-      const newClientData = { id: Date.now(), ...newClient };
-      setClients([...clients, newClientData]); 
-      await saveToSheet('clients', newClientData);
-      setNewClient({ name: '', color: '#228BE6' }); 
-      setShowAddClient(false); 
-    } 
-  };
+  const addCat = () => { if (newCat.name) { setCategories([...categories, { id: Date.now(), ...newCat }]); setNewCat({ name: '', color: '#228BE6' }); } };
+  const deleteCat = id => { const count = tasks.filter(t => t.categoryId === id).length; if (count > 0) { alert(`Cannot delete - used in ${count} tasks`); return; } setCategories(categories.filter(c => c.id !== id)); };
 
-  const deleteClient = id => { 
-    setClients(clients.filter(c => c.id !== id)); 
-    setTasks(tasks.filter(t => t.clientId !== id)); 
-    if (selectedClient === id) setSelectedClient(null); 
-  };
+  const addCheckItem = tid => { if (!newCheckItem.trim()) return; setTasks(tasks.map(t => t.id === tid ? {...t, checklist: [...t.checklist, {id: Date.now(), text: newCheckItem, done: false}]} : t)); setNewCheckItem(''); };
+  const toggleCheck = (tid, iid) => setTasks(tasks.map(t => t.id === tid ? {...t, checklist: t.checklist.map(c => c.id === iid ? {...c, done: !c.done} : c)} : t));
+  const delCheck = (tid, iid) => setTasks(tasks.map(t => t.id === tid ? {...t, checklist: t.checklist.filter(c => c.id !== iid)} : t));
 
-  const addCat = async () => { 
-    if (newCat.name) { 
-      const newCatData = { id: Date.now(), ...newCat };
-      setCategories([...categories, newCatData]); 
-      await saveToSheet('categories', newCatData);
-      setNewCat({ name: '', color: '#228BE6' }); 
-    } 
-  };
-
-  const deleteCat = id => { 
-    const count = tasks.filter(t => t.categoryId === id).length; 
-    if (count > 0) { 
-      alert(`Cannot delete - used in ${count} tasks`); 
-      return; 
-    } 
-    setCategories(categories.filter(c => c.id !== id)); 
-  };
-
-  const addCheckItem = async (tid) => {
-    if (!newCheckItem.trim()) return;
-    const task = tasks.find(t => t.id === tid);
-    const updatedTask = {
-      ...task,
-      checklist: [...(task.checklist || []), {id: Date.now(), text: newCheckItem, done: false}]
-    };
-    setTasks(tasks.map(t => t.id === tid ? updatedTask : t));
-    await saveToSheet('tasks', updatedTask);
-    setNewCheckItem('');
-  };
-
-  const toggleCheck = async (tid, iid) => {
-    const task = tasks.find(t => t.id === tid);
-    const updatedTask = {
-      ...task,
-      checklist: task.checklist.map(c => c.id === iid ? {...c, done: !c.done} : c)
-    };
-    setTasks(tasks.map(t => t.id === tid ? updatedTask : t));
-    await saveToSheet('tasks', updatedTask);
-  };
-
-  const delCheck = async (tid, iid) => {
-    const task = tasks.find(t => t.id === tid);
-    const updatedTask = {
-      ...task,
-      checklist: task.checklist.filter(c => c.id !== iid)
-    };
-    setTasks(tasks.map(t => t.id === tid ? updatedTask : t));
-    await saveToSheet('tasks', updatedTask);
-  };
-
-  const addAtt = async (tid) => {
-    if (!newAtt.name || !newAtt.url) return;
-    const task = tasks.find(t => t.id === tid);
-    const updatedTask = {
-      ...task,
-      attachments: [...(task.attachments || []), {id: Date.now(), ...newAtt}]
-    };
-    setTasks(tasks.map(t => t.id === tid ? updatedTask : t));
-    await saveToSheet('tasks', updatedTask);
-    setNewAtt({type:'link',name:'',url:''});
-  };
-
-  const delAtt = async (tid, aid) => {
-    const task = tasks.find(t => t.id === tid);
-    const updatedTask = {
-      ...task,
-      attachments: task.attachments.filter(a => a.id !== aid)
-    };
-    setTasks(tasks.map(t => t.id === tid ? updatedTask : t));
-    await saveToSheet('tasks', updatedTask);
-  };
+  const addAtt = tid => { if (!newAtt.name || !newAtt.url) return; setTasks(tasks.map(t => t.id === tid ? {...t, attachments: [...t.attachments, {id: Date.now(), ...newAtt, path: newAtt.type === 'file' ? newAtt.url : undefined, url: newAtt.type === 'link' ? newAtt.url : undefined}]} : t)); setNewAtt({type:'link',name:'',url:''}); };
+  const delAtt = (tid, aid) => setTasks(tasks.map(t => t.id === tid ? {...t, attachments: t.attachments.filter(a => a.id !== aid)} : t));
 
   const getClient = id => clients.find(c => c.id === id);
   const getCat = id => categories.find(c => c.id === id);
   const getPri = id => priorities.find(p => p.id === id);
-  
   const filtered = selectedClient ? tasks.filter(t => t.clientId === selectedClient) : tasks;
   const colTasks = status => filtered.filter(t => t.status === status);
-  
-  const totalH = tasks.reduce((s,t) => s + (t.timeSpent || 0), 0);
-  const totalE = tasks.reduce((s,t) => s + (t.timeSpent || 0) * t.hourlyRate, 0);
-  const clientH = id => tasks.filter(t => t.clientId === id).reduce((s,t) => s + (t.timeSpent || 0), 0);
-  const clientE = id => tasks.filter(t => t.clientId === id).reduce((s,t) => s + (t.timeSpent || 0) * t.hourlyRate, 0);
+  const totalH = tasks.reduce((s,t) => s + t.timeSpent, 0);
+  const totalE = tasks.reduce((s,t) => s + t.timeSpent * t.hourlyRate, 0);
+  const clientH = id => tasks.filter(t => t.clientId === id).reduce((s,t) => s + t.timeSpent, 0);
+  const clientE = id => tasks.filter(t => t.clientId === id).reduce((s,t) => s + t.timeSpent * t.hourlyRate, 0);
 
   const getMonthlyStats = (month) => {
     const year = month.getFullYear();
@@ -295,8 +174,8 @@ export default function PikuPlanner() {
       return taskDate.getFullYear() === year && taskDate.getMonth() === m;
     });
     return {
-      hours: monthTasks.reduce((sum, t) => sum + (t.timeSpent || 0), 0),
-      earnings: monthTasks.reduce((sum, t) => sum + ((t.timeSpent || 0) * t.hourlyRate), 0),
+      hours: monthTasks.reduce((sum, t) => sum + t.timeSpent, 0),
+      earnings: monthTasks.reduce((sum, t) => sum + (t.timeSpent * t.hourlyRate), 0),
       taskCount: monthTasks.length
     };
   };
@@ -334,41 +213,15 @@ export default function PikuPlanner() {
   const monthNamesShort = ['Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μαι', 'Ιουν', 'Ιουλ', 'Αυγ', 'Σεπ', 'Οκτ', 'Νοε', 'Δεκ'];
   const currentMonthStats = getMonthlyStats(statsMonth);
 
-  const th = { 
-    bg: dark ? 'bg-slate-900' : 'bg-slate-50', 
-    card: dark ? 'bg-slate-800' : 'bg-white', 
-    border: dark ? 'border-slate-700' : 'border-slate-200', 
-    text: dark ? 'text-slate-100' : 'text-slate-800', 
-    muted: dark ? 'text-slate-400' : 'text-slate-500', 
-    input: dark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-200', 
-    col: dark ? 'bg-slate-800/50' : 'bg-slate-100', 
-    hover: dark ? 'hover:bg-slate-700' : 'hover:bg-slate-100', 
-    sel: dark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-50 text-blue-700' 
-  };
+  const th = { bg: dark ? 'bg-slate-900' : 'bg-slate-50', card: dark ? 'bg-slate-800' : 'bg-white', border: dark ? 'border-slate-700' : 'border-slate-200', text: dark ? 'text-slate-100' : 'text-slate-800', muted: dark ? 'text-slate-400' : 'text-slate-500', input: dark ? 'bg-slate-700 border-slate-600 text-white' : 'bg-white border-slate-200', col: dark ? 'bg-slate-800/50' : 'bg-slate-100', hover: dark ? 'hover:bg-slate-700' : 'hover:bg-slate-100', sel: dark ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-50 text-blue-700' };
 
-  if (loading) {
+  // Show loading state
+  if (!isLoaded) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
         <div className="text-center">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-3xl mx-auto mb-4">🦊</div>
-          <p className={th.text}>Loading Piku Planner from Google Sheets...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center ${th.bg}`}>
-        <div className="text-center p-6 bg-red-500/20 rounded-xl border border-red-500">
-          <p className="text-red-400 mb-2">Error loading data</p>
-          <p className={`text-sm ${th.muted}`}>{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg"
-          >
-            Retry
-          </button>
+          <p className={th.text}>Loading Piku Planner...</p>
         </div>
       </div>
     );
@@ -377,7 +230,7 @@ export default function PikuPlanner() {
   const TaskCard = ({ task: t }) => {
     const cl = getClient(t.clientId), cat = getCat(t.categoryId), pri = getPri(t.priority);
     const isTrack = tracking === t.id, isEdit = editing === t.id, isExp = expanded === t.id;
-    const earn = (t.timeSpent || 0) * t.hourlyRate, chkDone = t.checklist?.filter(c=>c.done).length || 0, chkTot = t.checklist?.length || 0;
+    const earn = t.timeSpent * t.hourlyRate, chkDone = t.checklist?.filter(c=>c.done).length || 0, chkTot = t.checklist?.length || 0;
 
     return (
       <div draggable={!isEdit && !isExp} onDragStart={e => onDragStart(e, t)} className={`${th.card} rounded-lg border ${th.border} p-3 cursor-move hover:shadow-md transition-all group ${dragged?.id === t.id ? 'opacity-50' : ''} ${isTrack ? 'ring-2 ring-red-400' : ''}`}>
@@ -476,7 +329,7 @@ export default function PikuPlanner() {
             <div className={`flex items-center justify-between pt-2 border-t ${th.border}`}>
               <div className="flex items-center gap-2">
                 <Clock className={`w-3 h-3 ${th.muted}`}/>
-                <span className={`text-xs font-mono ${th.muted}`}>{fmtH(t.timeSpent || 0)}</span>
+                <span className={`text-xs font-mono ${th.muted}`}>{fmtH(t.timeSpent)}</span>
                 <span className="text-xs text-emerald-400">€{earn.toFixed(0)}</span>
               </div>
               {t.status !== 'done' && (isTrack ? (
@@ -812,7 +665,7 @@ export default function PikuPlanner() {
                 <h3 className={`font-semibold ${th.text} mb-4`}>Time by Category</h3>
                 <div className="grid grid-cols-4 gap-3">
                   {categories.map(c => {
-                    const hrs = tasks.filter(t=>t.categoryId===c.id).reduce((s,t)=>s+(t.timeSpent || 0),0);
+                    const hrs = tasks.filter(t=>t.categoryId===c.id).reduce((s,t)=>s+t.timeSpent,0);
                     return (
                       <div key={c.id} className="text-center p-4 rounded-xl" style={{backgroundColor:`${c.color}20`}}>
                         <div className="text-xl font-bold font-mono" style={{color:c.color}}>{hrs.toFixed(1)}h</div>
