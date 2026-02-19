@@ -1,6 +1,6 @@
 {
   "name": "piku-planner",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,11 +8,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "14.x",
-    "react": "18.x",
-    "react-dom": "18.x",
-    "firebase": "^10.12.2",
-    "lucide-react": "^0.263.1"
+    "next": "14.0.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "lucide-react": "^0.294.0"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0",
