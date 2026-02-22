@@ -40,16 +40,20 @@ const api = {
     }
   },
   
-  async saveAll(data) {
-    try {
-      const url = `${SCRIPT_URL}?action=saveAll&data=${encodeURIComponent(JSON.stringify(data))}`;
-      await fetch(url);
-      return true;
-    } catch (error) {
-      console.error('Error saving data:', error);
-      return false;
-    }
+async saveAll(data) {
+  try {
+    const url = `${SCRIPT_URL}?action=saveAll`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return true;
+  } catch (error) {
+    console.error('Error saving data:', error);
+    return false;
   }
+}
 };
 // Helper functions for localStorage
 const loadFromStorage = (key, defaultValue) => {
