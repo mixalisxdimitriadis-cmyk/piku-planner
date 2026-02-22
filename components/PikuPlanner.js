@@ -27,7 +27,30 @@ const priorities = [
   { id: 'medium', name: 'Medium', color: '#FAB005' },
   { id: 'high', name: 'High', color: '#FA5252' },
 ];
-
+// API Helper for Google Sheets
+const api = {
+  async getAll() {
+    try {
+      const response = await fetch(`${SCRIPT_URL}?action=getAll`);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return null;
+    }
+  },
+  
+  async saveAll(data) {
+    try {
+      const url = `${SCRIPT_URL}?action=saveAll&data=${encodeURIComponent(JSON.stringify(data))}`;
+      await fetch(url);
+      return true;
+    } catch (error) {
+      console.error('Error saving data:', error);
+      return false;
+    }
+  }
+};
 // Helper functions for localStorage
 const loadFromStorage = (key, defaultValue) => {
   if (typeof window === 'undefined') return defaultValue;
@@ -72,44 +95,30 @@ export default function PikuPlanner() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statsMonth, setStatsMonth] = useState(new Date());
 
-  // Load data from localStorage on mount
-  useEffect(() => {
-    const savedTasks = loadFromStorage('piku_tasks', defaultTasks);
-    const savedClients = loadFromStorage('piku_clients', defaultClients);
-    const savedCategories = loadFromStorage('piku_categories', defaultCategories);
-    const savedDark = loadFromStorage('piku_dark', true);
-    
-    setTasks(savedTasks);
-    setClients(savedClients);
-    setCategories(savedCategories);
-    setDark(savedDark);
+// Load data from Google Sheets on mount
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      const data = await api.getAll();
+      if (data) {
+        if (data.clients?.length > 0) setClients(data.clients);
+        if (data.categories?.length > 0) setCategories(data.categories);
+        if (data.tasks) setTasks(data.tasks);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
     setIsLoaded(true);
-  }, []);
+  };
+  loadData();
+}, []);
 
-  // Save to localStorage whenever data changes
+// Save to Google Sheets whenever data changes
   useEffect(() => {
     if (isLoaded) {
-      saveToStorage('piku_tasks', tasks);
+      api.saveAll({ clients, categories, tasks });
     }
-  }, [tasks, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      saveToStorage('piku_clients', clients);
-    }
-  }, [clients, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      saveToStorage('piku_categories', categories);
-    }
-  }, [categories, isLoaded]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      saveToStorage('piku_dark', dark);
-    }
-  }, [dark, isLoaded]);
+  }, [tasks, clients, categories, isLoaded]);
 
   useEffect(() => {
     let i; if (tracking) i = setInterval(() => setElapsed(e => e + 1), 1000);
