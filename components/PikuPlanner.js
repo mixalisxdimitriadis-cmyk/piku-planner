@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Plus, X, Clock, Users, Calendar, CheckCircle2, Circle, Timer, FolderKanban, Trash2, Edit3, ChevronLeft, ChevronRight, Save, Moon, Sun, FileText, Link, Paperclip, CheckSquare, Square as SquareIcon, ChevronDown, ChevronUp, BarChart3, Euro, Tag } from 'lucide-react';
-
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzjbiE8ivPochiu4ZjxhSr9J-CPaRvZMFza9DY9QyDdw9iUSvd0UfIieBb8NZ_tJehTYg/exec';
 const defaultClients = [
   { id: 1, name: 'Creative Agency', color: '#FF6B6B' },
   { id: 2, name: 'Tech Startup', color: '#4ECDC4' },
