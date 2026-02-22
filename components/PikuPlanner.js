@@ -670,6 +670,7 @@ export default function PikuPlanner() {
                       <div key={c.id} className="text-center p-4 rounded-xl" style={{backgroundColor:`${c.color}20`}}>
                         <div className="text-xl font-bold font-mono" style={{color:c.color}}>{hrs.toFixed(1)}h</div>
                         <div className={`text-xs ${th.muted} mt-1`}>{c.name}</div>
+                  
                       </div>
                     );
                   })}
