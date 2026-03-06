@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Square, Plus, X, Clock, Users, Calendar, CheckCircle2, Circle, Timer, FolderKanban, Trash2, Edit3, ChevronLeft, ChevronRight, Save, Moon, Sun, FileText, Link, Paperclip, CheckSquare, Square as SquareIcon, ChevronDown, ChevronUp, BarChart3, Euro, Tag } from 'lucide-react';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzjbiE8ivPochiu4ZjxhSr9J-CPaRvZMFza9DY9QyDdw9iUSvd0UfIieBb8NZ_tJehTYg/exec';
+
 const defaultClients = [
   { id: 1, name: 'Creative Agency', color: '#FF6B6B' },
   { id: 2, name: 'Tech Startup', color: '#4ECDC4' },
@@ -27,34 +27,7 @@ const priorities = [
   { id: 'medium', name: 'Medium', color: '#FAB005' },
   { id: 'high', name: 'High', color: '#FA5252' },
 ];
-// API Helper for Google Sheets
-const api = {
-  async getAll() {
-    try {
-      const response = await fetch(`${SCRIPT_URL}?action=getAll`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      return null;
-    }
-  },
-  
-async saveAll(data) {
-  try {
-    const url = `${SCRIPT_URL}?action=saveAll`;
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return true;
-  } catch (error) {
-    console.error('Error saving data:', error);
-    return false;
-  }
-}
-};
+
 // Helper functions for localStorage
 const loadFromStorage = (key, defaultValue) => {
   if (typeof window === 'undefined') return defaultValue;
@@ -99,30 +72,44 @@ export default function PikuPlanner() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statsMonth, setStatsMonth] = useState(new Date());
 
-// Load data from Google Sheets on mount
-useEffect(() => {
-  const loadData = async () => {
-    try {
-      const data = await api.getAll();
-      if (data) {
-        if (data.clients?.length > 0) setClients(data.clients);
-        if (data.categories?.length > 0) setCategories(data.categories);
-        if (data.tasks) setTasks(data.tasks);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    }
+  // Load data from localStorage on mount
+  useEffect(() => {
+    const savedTasks = loadFromStorage('piku_tasks', defaultTasks);
+    const savedClients = loadFromStorage('piku_clients', defaultClients);
+    const savedCategories = loadFromStorage('piku_categories', defaultCategories);
+    const savedDark = loadFromStorage('piku_dark', true);
+    
+    setTasks(savedTasks);
+    setClients(savedClients);
+    setCategories(savedCategories);
+    setDark(savedDark);
     setIsLoaded(true);
-  };
-  loadData();
-}, []);
+  }, []);
 
-// Save to Google Sheets whenever data changes
+  // Save to localStorage whenever data changes
   useEffect(() => {
     if (isLoaded) {
-      api.saveAll({ clients, categories, tasks });
+      saveToStorage('piku_tasks', tasks);
     }
-  }, [tasks, clients, categories, isLoaded]);
+  }, [tasks, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_clients', clients);
+    }
+  }, [clients, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_categories', categories);
+    }
+  }, [categories, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveToStorage('piku_dark', dark);
+    }
+  }, [dark, isLoaded]);
 
   useEffect(() => {
     let i; if (tracking) i = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -683,7 +670,6 @@ useEffect(() => {
                       <div key={c.id} className="text-center p-4 rounded-xl" style={{backgroundColor:`${c.color}20`}}>
                         <div className="text-xl font-bold font-mono" style={{color:c.color}}>{hrs.toFixed(1)}h</div>
                         <div className={`text-xs ${th.muted} mt-1`}>{c.name}</div>
-                  
                       </div>
                     );
                   })}
